@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {newPlayback,advancePlayback,duration,CONTACT,beat,heading} from '../src/combatMotion.js';
+
+const rounds=[{type:'strike'},{type:'takedown'},{type:'bite'}];
+const clock=newPlayback();
+advancePlayback(clock,duration(rounds[0])*(CONTACT-.01),1,rounds);
+assert.equal(clock.committed,0,'Condition must not change before contact.');
+advancePlayback(clock,duration(rounds[0])*.02,1,rounds);
+assert.equal(clock.committed,1);
+const held={...clock};advancePlayback(clock,0,4,rounds);assert.deepEqual(clock,held,'Pausing must preserve progress.');
+const progress=clock.progress;advancePlayback(clock,50,2,rounds);
+assert(Math.abs(clock.progress-progress-100/duration(rounds[0]))<1e-9,'Speed changes preserve existing progress.');
+const total=rounds.reduce((sum,r)=>sum+duration(r),0);
+const whole=newPlayback(),split=newPlayback();advancePlayback(whole,total,1,rounds);
+for(let i=0;i<total;i+=10)advancePlayback(split,Math.min(10,total-i),1,rounds);
+assert.deepEqual(split,whole,'Frame spacing must not change the outcome of playback.');
+assert.equal(whole.committed,3);assert.equal(whole.done,true);assert.equal(whole.progress,1);
+for(const p of [0,.1,.23,.44,.5,.75,1])for(const n of Object.values(beat(p)))assert(n>=0&&n<=1);
+assert(beat(.23).windup>.9);assert(beat(CONTACT).extend>.99);assert.equal(beat(.4).recoil,0);assert.equal(beat(1).extend,0);
+assert.equal(heading(9,42),heading(9,42));
+console.log('Contact timing, pause, speed changes, frame-rate independence and final recovery passed.');

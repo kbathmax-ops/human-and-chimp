@@ -31,6 +31,12 @@ The script also renders `blender/character-study.png`. Keep the GLB files and bu
 
 Standing exchanges can enter a clinch, become a takedown, persist on the ground, switch control, and recover to standing. Pulls, bites, bite-and-pull tears, forearm frames, covering and defensive strikes use distinct events. Injury is represented by muted surface marks, with no blood particles, exposed tissue or dismemberment. Positions and attack frequencies remain illustrative assumptions. The development-only `/tests/pose-check.html` lets reviewers inspect the standing, clinch and both ground-control poses.
 
+## Combat animation
+
+Exchanges now have anticipation, contact, recoil and recovery, with alternating lead arms, circling footwork, evasive movement and brief dust cues. Arm joints aim toward the opponent during strikes and grips. Takedowns blend into ground positions. One shared playback clock keeps condition changes, narration and animation aligned at contact; pause, speed changes and seeded replays retain that timing. These are authored animations, not a physical collision solver.
+
+Run `npm test` for playback timing checks and the existing 2,000 seeded simulation checks.
+
 ## Research and interpretation
 
 This is an illustrative scenario model, not a validated fight predictor. The 1.35× comparison concerns equal-sized muscle in a 2017 biomechanical model; it does not mean a chimp is 1.35× stronger than every human. Mass, readiness, contact distance, fatigue and individual variation affect the simulation. Damage, attack probabilities and outcomes remain design assumptions. No measured real-world win odds are displayed.
