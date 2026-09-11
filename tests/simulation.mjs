@@ -4,11 +4,12 @@ import {createServer} from 'vite';
 const server=await createServer({server:{middlewareMode:true,hmr:false}});
 try {
   const {HUMANS,CHIMPS,makeFighter,simulateFight}=await server.ssrLoadModule('/src/FightSimulator.jsx');
-  const actions=new Set();let runs=0,groundSteps=0;
-  for(const h of HUMANS)for(const c of CHIMPS)for(let seed=0;seed<100;seed++) {
+  const actions=new Set();let runs=0,groundSteps=0;const rates=new Map();
+  for(const h of HUMANS)for(const c of CHIMPS)for(let seed=0;seed<(h.weapon?100:1000);seed++) {
     const human=makeFighter(h,'human'),chimp=makeFighter(c,'chimp');
     const result=simulateFight(human,chimp,seed);
     assert.deepEqual(result,simulateFight(human,chimp,seed),'Replay must preserve the encounter.');
+    if(!human.weapon){assert(result.targetMatched,`Balanced encounter search exhausted: ${h.id}/${c.id}/${seed}`);const key=h.id+'/'+c.id;const rate=rates.get(key)||{wins:0,total:0};rate.total++;rate.wins+=result.winner==='human'?1:0;rates.set(key,rate);}else assert.equal(result.balance,undefined);
     assert(result.rounds.length>0&&result.rounds.length<=60);
     for(const step of result.rounds) {
       actions.add(step.type);
@@ -24,5 +25,7 @@ try {
     runs++;
   }
   for(const type of ['clinch','pull','takedown','cover','frame','recover','tear','bite','kick','kick-miss'])assert(actions.has(type),`Missing action: ${type}`);
+  for(const [matchup,rate] of rates){assert(rate.wins/rate.total>=.03&&rate.wins/rate.total<=.07,`${matchup}: unexpected win mix ${rate.wins}/${rate.total}`);}
+  console.log('Unarmed win rates:',Object.fromEntries([...rates].map(([key,r])=>[key,r.wins+'/'+r.total])));
   console.log(`${runs} seeded encounters passed; ${groundSteps} ground steps; ${actions.size} action types.`);
 } finally {await server.close();}

@@ -41,6 +41,8 @@ Unarmed humans can now attempt front kicks while standing with enough room and e
 
 ## Research and interpretation
 
+The default unarmed mode now targets roughly 5% human wins as an explicit arcade difficulty. A seeded 5% draw chooses the desired winner, then searches up to 256 complete encounters for a matching outcome. Pressure mode boosts chimp combat effectiveness relative to the selected human and increases clinches, takedowns and ground control. For a rare human-win draw, the search may use a lower-pressure encounter after 64 attempts. HP, positions and verdicts are never rewritten; on search exhaustion the last valid encounter is used. The Research panel discloses this selection. Weapon encounters bypass the filter and effectiveness boost. These choices are game design, not measured animal behavior or survival odds.
+
 This is an illustrative scenario model, not a validated fight predictor. The 1.35× comparison concerns equal-sized muscle in a 2017 biomechanical model; it does not mean a chimp is 1.35× stronger than every human. Mass, readiness, contact distance, fatigue and individual variation affect the simulation. Damage, attack probabilities and outcomes remain design assumptions. No measured real-world win odds are displayed.
 
 See RESEARCH.md and the in-app Research panel for sources.

@@ -32,12 +32,23 @@ export const maxHP=f=>Math.round(100*Math.pow(f.mass/75,.28));
 function Icon({name,size=18}){const paths={leaf:'M20 4C8 2 2 9 7 16s16 2 13-12ZM5 21 16 8M9 15l-1-5m5 1 4 1',arrow:'M5 12h14m-5-5 5 5-5 5',play:'m9 5 11 7-11 7Z',pause:'M8 5v14M16 5v14',reset:'M4 10a8 8 0 1 1 1 8M4 4v6h6',info:'M12 11v6m0-10v1M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',close:'m6 6 12 12M6 18 18 6',eye:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0',grid:'m12 3 9 5-9 5-9-5Zm-9 9 9 5 9-5M3 17l9 5 9-5',sun:'M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2m-3 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',cross:'m5 4 15 16M4 5l3-3m10 20 5-5M19 4 4 19m-2-2 5 5M17 2l5 5'};return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]||paths.leaf}/></svg>}
 // Seeded state simulation, not an empirically calibrated combat predictor.
 export function simulateFight(human,chimp,seed=Date.now(),options={}){
- let s=seed>>>0;const random=()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296};
+ // Arcade balancing selects a complete, valid encounter, never edits its verdict or HP.
+ if(!human.weapon&&options.balance!==false){
+  let draw=(seed^0x9e3779b9)>>>0;draw=Math.imul(draw^(draw>>>16),0x21f0aaad);draw=Math.imul(draw^(draw>>>15),0x735a2d97);draw=(draw^(draw>>>15))>>>0;
+  const target=draw/4294967296<.05?'human':'chimp';let candidate;
+  for(let attempt=0;attempt<256;attempt++){
+   candidate=simulateFight(human,chimp,(draw+Math.imul(attempt+1,2654435761))>>>0,{...options,balance:false,pressure:target==='chimp'||attempt<64});
+   if(candidate.winner===target)return {...candidate,seed:seed>>>0,balance:'arcade-5',targetMatched:true};
+  }
+  return {...candidate,seed:seed>>>0,balance:'arcade-5',targetMatched:false};
+ }
+ let s=seed>>>0;const pressure=options.pressure!==false;const random=()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296};
  const cfg={distance:clamp(Number(options.distance)||4,1.5,10),readiness:options.readiness==='unready'?'unready':'ready',burst:clamp(Number(options.burst)||1.35,1.2,1.5)};
  let distance=cfg.distance,humanHP=maxHP(human),chimpHP=maxHP(chimp),hs=100,cs=100,elapsed=0,grapple=false,grappleCount=0,ground=false,groundController='chimp',injuryH=0,injuryC=0;
  const rounds=[];let winner=null,outcome='unresolved',readyAt=cfg.readiness==='ready'?0:1.6+random()*1.8;
  const individualH=.9+random()*.2,individualC=.9+random()*.2;
- const capability=(f,stamina,burst=false)=>f.force*(.45+.55*stamina/100)*(f.side==='human'?individualH:individualC)*(burst&&f.side==='chimp'?cfg.burst:1);
+ const arcadeBoost=pressure&&!human.weapon?Math.max(1,human.force/chimp.force*1.35):1;
+ const capability=(f,stamina,burst=false)=>f.force*(.45+.55*stamina/100)*(f.side==='human'?individualH:individualC*arcadeBoost)*(burst&&f.side==='chimp'?cfg.burst:1);
  const record=(side,type,text,damage=0,hit=false,actionDistance=distance)=>{rounds.push({round:rounds.length+1,side,type,text,damage,landed:hit,humanHP,chimpHP,humanStamina:Math.round(hs),chimpStamina:Math.round(cs),distance:+distance.toFixed(2),position:ground?'ground':grapple?'clinch':'standing',groundController:ground?groundController:null,injuryH,injuryC,actionDistance:actionDistance,time:+elapsed.toFixed(1),phase:ground?'Ground defense':grapple?'Clinch':distance>2.8?'Outside reach':distance>1.15?'At range':'Close contact'})};
  const hurt=(side,amount)=>{const damage=Math.min(side==='human'?chimpHP:humanHP,Math.max(1,Math.round(amount)));if(side==='human')chimpHP-=damage;else humanHP-=damage;return damage};
  for(let round=1;round<=60;round++){
@@ -46,10 +57,10 @@ export function simulateFight(human,chimp,seed=Date.now(),options={}){
   if(round>10&&distance>1.5&&((hs<22&&cs<22)||(Math.min(humanHP/maxHP(human),chimpHP/maxHP(chimp))<.3&&random()<.09))){distance=4.5;record('none','disengage','The contenders separate. The encounter ends without a decisive result.');outcome='disengaged';break}
   const hCap=capability(human,hs),cCap=capability(chimp,cs),previousDistance=distance;
   if(ground){
-   const escape=clamp(.10+.24*(hCap/(hCap+cCap))*human.skill,.12,.42);
+   const escape=pressure?clamp(.06+.14*(hCap/(hCap+cCap))*human.skill,.08,.28):clamp(.10+.24*(hCap/(hCap+cCap))*human.skill,.12,.42);
    if(random()<escape){ground=false;grapple=false;distance=1.7;hs=clamp(hs-6,0,100);cs=clamp(cs-4,0,100);record('human','recover','The human makes space and regains a standing position.',0,false,previousDistance);continue}
    const humanControls=groundController==='human';
-   if(random()<.14){groundController=humanControls?'chimp':'human';hs=clamp(hs-5,0,100);cs=clamp(cs-5,0,100);record(groundController,'turn','The balance shifts as the fighters turn on the ground.',0,false,previousDistance);continue}
+   if(random()<(pressure?(humanControls?.25:.08):.14)){groundController=humanControls?'chimp':'human';hs=clamp(hs-5,0,100);cs=clamp(cs-5,0,100);record(groundController,'turn','The balance shifts as the fighters turn on the ground.',0,false,previousDistance);continue}
    const side=humanControls?(random()<.63?'human':'chimp'):(random()<.80?'chimp':'human');
    const roll=random(),type=side==='human'?'ground-strike':roll<.36?'bite':roll<.53?'tear':'pin';
    const defended=side==='chimp'&&random()<clamp(.20+(human.skill-1)*.45+hs*.001,.2,.5);
@@ -60,7 +71,7 @@ export function simulateFight(human,chimp,seed=Date.now(),options={}){
    record(side,defended?'cover':type,defended?'The human covers and frames against the pressure, reducing the impact.':type==='bite'?'A close-contact bite lands during the ground struggle.':type==='tear'?'A bite-and-pull causes a small tear. The injury is shown with a muted mark.':type==='pin'?'The chimp keeps its weight over the human in a brief ground hold.':'The human lands a short defensive strike from the ground.',damage,true,previousDistance);
   }else if(grapple){
    grappleCount++;
-   if(grappleCount>1&&random()<.30){
+   if(grappleCount>1&&random()<(pressure?.48:.30)){
     ground=true;grapple=false;groundController=random()<hCap/(hCap+cCap*1.15)?'human':'chimp';distance=.55;
     hs=clamp(hs-7,0,100);cs=clamp(cs-7,0,100);
     record(groundController,'takedown',groundController==='chimp'?'The chimp pulls the human off balance. Both go to the ground.':'The human turns the clinch and brings the struggle to the ground.',hurt(groundController,4+random()*5),true,previousDistance);
@@ -87,9 +98,9 @@ export function simulateFight(human,chimp,seed=Date.now(),options={}){
    if(hit){const damage=hurt('human',(30+random()*20)*hCap);distance=Math.max(1.5,distance-.15);record('human','spear','A spear strike connects from beyond hand-to-hand range.',damage,true,previousDistance)}else{distance=Math.max(.7,distance-(.65+random()*.65));record('human','miss','The reach advantage does not produce a hit. The chimp moves inside it.',0,false,previousDistance);if(distance<=1.15)grapple=true}cs=clamp(cs-4,0,100);
   }else{
    // Both sides can fail to connect. Activity does not grant invulnerability.
-   const cInitiative=capability(chimp,cs,true)*(.7+chimp.aggression*.5),hInitiative=hCap*(human.id==='mma'?1.18:1);
+   const cInitiative=capability(chimp,cs,true)*(pressure?1.05+chimp.aggression*.65:.7+chimp.aggression*.5),hInitiative=hCap*(human.id==='mma'?1.18:1);
    const side=random()<hInitiative/(hInitiative+cInitiative)?'human':'chimp';
-   if(side==='chimp'&&random()<.38){
+   if(side==='chimp'&&random()<(pressure?.60:.38)){
     distance=.7;grapple=true;hs=clamp(hs-3,0,100);cs=clamp(cs-5,0,100);record('chimp','clinch','The chimp enters a clinch. Long reach is less useful at this distance.',0,false,previousDistance);
    }else{
     const f=side==='human'?human:chimp,st=side==='human'?hs:cs;
@@ -153,7 +164,7 @@ export default function FightSimulator(){
  {[[ 'Human mass',massH,'kg',60,125,.1,setMassH],['Human height',height,'cm',165,205,.5,setHeight],['Chimp mass',massC,'kg',25,70,1,setMassC]].map(([label,value,unit,min,max,step,setter])=><label key={label}>{label}<b>{value} {unit}</b><input aria-label={label} type="range" min={min} max={max} step={step} value={value} disabled={locked} onChange={e=>tune(setter,+e.target.value)}/></label>)}
  <label>Starting distance<select value={distance} disabled={locked} onChange={e=>tune(setDistance,+e.target.value)}><option value={1.5}>1.5 m · close</option><option value={4}>4 m · apart</option><option value={10}>10 m · distant</option></select></label><label>Chimp muscle power<select value={burst} disabled={locked} onChange={e=>tune(setBurst,+e.target.value)}><option value={1.2}>1.20× · lower assumption</option><option value={1.35}>1.35× · study reference</option><option value={1.5}>1.50× · higher assumption</option></select></label>{human.weapon&&<label>Weapon readiness<select value={readiness} disabled={locked} onChange={e=>tune(setReadiness,e.target.value)}><option value="ready">Ready</option><option value="unready">Delayed response</option></select></label>}</div><p>The muscle comparison is for equal-sized muscle, not whole-body strength. The alternatives test assumptions; they are not measured limits.</p><details><summary>Compare game ratings</summary><p>0–100 ratings are model inputs, not measured physiology.</p><div className="ratings">{STAT_NAMES.map((name,i)=><div key={name}><span>{name}</span><b>{human.stats[i]}</b><b>{chimp.stats[i]}</b></div>)}</div></details></dialog>
  <dialog ref={journalDialog} aria-labelledby="journal-title" onClick={e=>{if(e.target===e.currentTarget)journalDialog.current.close()}}><div className="dialog-top"><span>THE ENCOUNTER</span><button aria-label="Close journal" onClick={()=>journalDialog.current.close()}>×</button></div><h2 id="journal-title">Field journal.</h2>{status==='done'&&<section className="verdict"><h3>{winnerFighter?winnerFighter.short+' prevails':'No decisive winner'}</h3><p>{explanation(result,human,chimp)}</p></section>}<div ref={logRef} className="log">{cursor?result.rounds.slice(0,cursor).map(r=><div className="log-row" key={r.round}><span>{r.time.toFixed(1)}s</span><p>{r.text}<small>{r.distance.toFixed(1)} m apart{r.damage?' · −'+r.damage+' condition':''}</small></p></div>):<p>Start an encounter to see what happens.</p>}</div></dialog>
- <dialog ref={modelDialog} aria-labelledby="model-title" onClick={e=>{if(e.target===e.currentTarget)modelDialog.current.close()}}><div className="dialog-top"><span>THE EVIDENCE</span><button aria-label="Close research" onClick={()=>modelDialog.current.close()}>×</button></div><ModelNotes/></dialog></main>
+ <dialog ref={modelDialog} aria-labelledby="model-title" onClick={e=>{if(e.target===e.currentTarget)modelDialog.current.close()}}><div className="dialog-top"><span>THE EVIDENCE</span><button aria-label="Close research" onClick={()=>modelDialog.current.close()}>×</button></div><p className="source-limit"><b>Arcade balance: approximately 1 human win in 20 unarmed encounters.</b> This is a chosen difficulty, not a research finding. Chimp combat effectiveness is boosted to match the selected opponent. The game selects complete encounters to approach that win mix, sometimes using lower pressure for a rare human win. Recorded damage and verdicts are not rewritten. Weapons bypass the boost and outcome selection. A limited search can occasionally miss the target.</p><ModelNotes/></dialog></main>
 }
 const CSS=`
 @font-face{font-family:Field;src:url('/display.ttf')}@font-face{font-family:Body;src:url('/body.ttf');font-weight:400}@font-face{font-family:Body;src:url('/body-bold.ttf');font-weight:700}

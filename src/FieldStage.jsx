@@ -52,6 +52,12 @@ export default function FieldStage({human,chimp,view,round=0,status='idle',last=
   const materials=new Map();const mat=c=>{if(!materials.has(c))materials.set(c,new THREE.MeshStandardMaterial({color:c,roughness:1,flatShading:true}));return materials.get(c)};
   function cube(w,h,d,x,y,z,color){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));m.position.set(x,y,z);m.receiveShadow=true;m.castShadow=true;scene.add(m);return m}
   cube(220,.6,220,0,-.33,0,'#91935b');let seed=4839;const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+  // A full ring of faceted peaks keeps the backdrop visible while orbiting.
+  for(let i=0;i<22;i++){
+   const angle=i*Math.PI*2/22,radius=66+(i%3)*8,height=17+(i%5)*4;
+   const peak=new THREE.Mesh(new THREE.ConeGeometry(14+(i%4)*3,height,5,1),mat(['#71888d','#849997','#657d86'][i%3]));
+   peak.position.set(Math.cos(angle)*radius,height/2-.4,Math.sin(angle)*radius);peak.rotation.y=angle+.3;peak.scale.z=.72;scene.add(peak);
+  }
   const grass=new THREE.InstancedMesh(new THREE.BoxGeometry(.028,.18,.028),mat('#71794c'),9000),dummy=new THREE.Object3D();for(let i=0;i<9000;i++){dummy.position.set((rand()-.5)*85,0,(rand()-.5)*85);dummy.scale.set(1,.5+rand()*1.7,1);dummy.updateMatrix();grass.setMatrixAt(i,dummy.matrix)}grass.receiveShadow=true;scene.add(grass);
   for(let i=0;i<65;i++)cube(rand()*4+.5,.01,rand()*3+.5,(rand()-.5)*100,-.023,(rand()-.5)*100,['#949762','#96985f','#8c8e54'][i%3]);
   function tree(x,z,scale){cube(.43*scale,3.2*scale,.45*scale,x,1.6*scale,z,'#685b3d');for(let i=0;i<4;i++){const canopy=new THREE.Mesh(new THREE.IcosahedronGeometry((1.3+i*.12)*scale,1),mat(['#647040','#727e49','#7e8650','#596739'][i]));canopy.scale.set(1.1,.78,1);canopy.position.set(x+(i%2?.55:-.5)*scale,(3.5+i*.38)*scale,z+(i>1?.6:-.4)*scale);canopy.castShadow=true;canopy.receiveShadow=true;scene.add(canopy)}}
@@ -140,7 +146,7 @@ export default function FieldStage({human,chimp,view,round=0,status='idle',last=
    const lead=(action?.round??0)%2?1:-1;
    for(const arm of f.arms){
     const striking=actor&&['strike','grapple','ground-strike'].includes(action?.type)&&arm.side===lead;
-    const gripping=(clinch||ground)&&['clinch','pull','pin','tear','bite','grapple','frame','cover'].includes(action?.type);
+    const gripping=(clinch||ground)&&['clinch','takedown','pull','pin','tear','bite','grapple','frame','cover'].includes(action?.type);
     if(f.isHuman&&live.current.human.weapon&&!gripping)continue;
     if(!striking&&!gripping)continue;
     const weight=striking?m.extend*.92:(prev?.position===action?.position? .76 : m.settle*.76);
@@ -178,6 +184,7 @@ export default function FieldStage({human,chimp,view,round=0,status='idle',last=
      if(action.type==='tear')x-=sign*m.tug*(actor?.13:-.10);
     }
     f.g.position.set(x*Math.cos(angle)-z*Math.sin(angle),0,x*Math.sin(angle)+z*Math.cos(angle));
+    if(!f.isHuman&&actor&&!reduced&&['clinch','takedown'].includes(action?.type))f.g.position.y=Math.sin(Math.PI*m.travel)*.24;
     f.g.rotation.y=(f.isHuman?Math.PI/2:-Math.PI/2)-angle;
     pose(f,s,action,prev,t,p,m);
    }
