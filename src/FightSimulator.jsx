@@ -92,9 +92,12 @@ export function simulateFight(human,chimp,seed=Date.now(),options={}){
    if(side==='chimp'&&random()<.38){
     distance=.7;grapple=true;hs=clamp(hs-3,0,100);cs=clamp(cs-5,0,100);record('chimp','clinch','The chimp enters a clinch. Long reach is less useful at this distance.',0,false,previousDistance);
    }else{
-    const f=side==='human'?human:chimp,st=side==='human'?hs:cs;const hit=random()<clamp(.46+(f.skill-1)*.55+(st-50)*.0015,.20,.82);
-    if(hit){const amount=(side==='human'?11:13)*capability(f,st,true)*(.75+random()*.5);const damage=hurt(side,amount);record(side,'strike',side==='human'?'A human strike connects in the standing exchange.':'A short, explosive strike connects. The effort consumes stamina.',damage,true,previousDistance)}else record(side,'miss',side==='human'?'The human’s strike misses as the chimp changes position.':'The chimp’s rush fails to connect. There is no damage this exchange.',0,false,previousDistance);
-    if(side==='human')hs=clamp(hs-(human.id==='mma'?3:4),0,100);else cs=clamp(cs-(chimp.id==='enraged'?7:5),0,100);
+    const f=side==='human'?human:chimp,st=side==='human'?hs:cs;
+    // Authored game choice: kicks need standing room and cost extra energy.
+    const kick=side==='human'&&!human.weapon&&st>18&&distance>=.85&&distance<=1.75&&random()<(human.id==='mma'?.46:.26);
+    const hit=random()<clamp(.46+(f.skill-1)*.55+(st-50)*.0015-(kick?.06:0),.20,.82);
+    if(hit){const amount=(kick?14:side==='human'?11:13)*capability(f,st,true)*(.75+random()*.5);const damage=hurt(side,amount);record(side,kick?'kick':'strike',kick?'A front kick connects. The human plants the foot again.':side==='human'?'A human strike connects in the standing exchange.':'A short, explosive strike connects. The effort consumes stamina.',damage,true,previousDistance)}else record(side,kick?'kick-miss':'miss',kick?'The kick misses as the chimp shifts aside.':side==='human'?'The human’s strike misses as the chimp changes position.':'The chimp’s rush fails to connect. There is no damage this exchange.',0,false,previousDistance);
+    if(side==='human')hs=clamp(hs-(human.id==='mma'?3:4)-(kick?3:0),0,100);else cs=clamp(cs-(chimp.id==='enraged'?7:5),0,100);
     if(random()<.22){distance=1.6;hs=clamp(hs+(human.id==='mma'?6:4),0,100);cs=clamp(cs+2.5,0,100)}else distance=.95;
    }
   }

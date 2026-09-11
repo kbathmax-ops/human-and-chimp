@@ -37,6 +37,8 @@ Exchanges now have anticipation, contact, recoil and recovery, with alternating 
 
 Run `npm test` for playback timing checks and the existing 2,000 seeded simulation checks.
 
+Unarmed humans can now attempt front kicks while standing with enough room and energy. Kicks can miss and use extra stamina; their frequency and damage are game assumptions. Exchanges play roughly one-third faster. Bite-and-pull tears use a jaw close, body tug and stretching, jagged surface marks without gore.
+
 ## Research and interpretation
 
 This is an illustrative scenario model, not a validated fight predictor. The 1.35× comparison concerns equal-sized muscle in a 2017 biomechanical model; it does not mean a chimp is 1.35× stronger than every human. Mass, readiness, contact distance, fatigue and individual variation affect the simulation. Damage, attack probabilities and outcomes remain design assumptions. No measured real-world win odds are displayed.

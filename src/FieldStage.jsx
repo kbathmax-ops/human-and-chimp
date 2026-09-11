@@ -22,7 +22,8 @@ function bindCharacter(f,asset,profile){
  model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.material=o.material.clone();o.geometry=o.geometry.clone();}});
  const markMaterial=new THREE.MeshBasicMaterial({color:'#a5654d',side:THREE.DoubleSide});
  for(let i=0;i<3;i++){
-  const mark=new THREE.Mesh(new THREE.PlaneGeometry(.12,.027),markMaterial);
+  const shape=new THREE.Shape();shape.moveTo(-.065,-.009);shape.lineTo(-.024,.009);shape.lineTo(0,-.006);shape.lineTo(.037,.018);shape.lineTo(.072,.006);shape.lineTo(.023,-.017);shape.lineTo(-.018,-.013);shape.closePath();
+  const mark=new THREE.Mesh(new THREE.ShapeGeometry(shape),markMaterial);
   mark.position.set(.02,-.15-i*.065,.129);mark.rotation.z=-.35;mark.visible=false;
   f.arms[1].elbow.add(mark);f.injuryMarks.push(mark);
  }
@@ -96,23 +97,27 @@ export default function FieldStage({human,chimp,view,round=0,status='idle',last=
    const current=posture(action,side),before=posture(prev,side),travel=reduced?1:m.settle;
    const blend=(key)=>THREE.MathUtils.lerp(before[key],current[key],travel);
    const lost=s.winner&&s.winner!==side,active=s.status==='running'||s.status==='paused';
-   const reaction=active&&!actor&&action?.landed?m.recoil:0,dodge=active&&!actor&&type==='miss'?m.extend:0;
+   const reaction=active&&!actor&&action?.landed?m.recoil:0,dodge=active&&!actor&&['miss','kick-miss'].includes(type)?m.extend:0;
+   const kicking=actor&&['kick','kick-miss'].includes(type),tearing=type==='tear',tug=tearing?m.tug:0;
    const moving=active&&!current.ground&&(['approach','prepare','break','recover'].includes(type)||Math.abs(heading((action?.round??1)-1,s.seed)-heading((action?.round??1)-2,s.seed))>.04);
-   const gait=moving&&!reduced?Math.sin(t*7):0,lead=(action?.round??0)%2?1:-1;
+   const gait=moving&&!reduced&&!kicking?Math.sin(t*10):0,lead=(action?.round??0)%2?1:-1;
    const attack=actor&&['strike','grapple','ground-strike','pull','tear','pin','clinch','spear','bite'].includes(type);
    const defending=humanSide&&['frame','cover'].includes(type);
    f.body.rotation.x=blend('x')+(current.ground?0:reaction*-.12+dodge*-.08+(attack?m.windup*-.08+m.extend*.08:0));
    f.body.rotation.z=lost&&!current.ground?1.35*(reduced?1:smooth(.48,1,p)):current.ground?0:reaction*lead*.10+dodge*lead*.12;
    f.body.rotation.y=current.ground?0:actor?(m.windup*.17-m.extend*.14)*lead:dodge*lead*.16;
+   f.body.rotation.x+=kicking?m.extend*-.16:tearing?(actor?-.12:.10)*tug:0;
    f.body.position.y=blend('y')-(current.ground?0:dodge*.14)+(moving?Math.abs(gait)*.022:0);
    f.head.rotation.x=current.under?.19:reaction*-.15+(actor&&['bite','tear'].includes(type)?m.extend*.25:0);
-   f.head.rotation.y=actor&&type==='miss'?m.extend*.20:0;
-   if(f.jaw)f.jaw.rotation.x=actor&&['bite','tear'].includes(type)?-.3*m.extend:0;
-   f.injuryMarks.forEach((mark,i)=>{mark.visible=i<(humanSide?s.last?.injuryH??0:s.last?.injuryC??0)});
+   f.head.rotation.y=actor&&type==='miss'?m.extend*.20:actor&&tearing?tug*.16:0;
+   if(f.jaw)f.jaw.rotation.x=actor&&['bite','tear'].includes(type)?-.3*m.extend*(1-tug*.85):0;
+   f.injuryMarks.forEach((mark,i)=>{mark.visible=i<(humanSide?s.last?.injuryH??0:s.last?.injuryC??0);mark.scale.set(1+(!actor?tug*.7:0),1+(!actor?tug*.3:0),1)});
    for(const leg of f.legs){
     leg.hip.rotation.x=blend('hip')+(moving?gait*leg.side*.24:0);
     leg.hip.rotation.z=current.ground?leg.side*.19:leg.side*.025;
     leg.knee.rotation.x=blend('knee')+(moving?Math.max(0,gait*leg.side)*.35:0);
+    if(kicking&&leg.side===lead){leg.hip.rotation.x-=m.windup*.72+m.extend*1.40;leg.knee.rotation.x+=m.windup*1.55+m.extend*.10;}
+    if(kicking&&leg.side!==lead){leg.knee.rotation.x+=m.extend*.12;leg.hip.rotation.z-=lead*m.extend*.06;}
    }
    for(const arm of f.arms){
     const reach=current.clinch||current.top;
@@ -120,6 +125,7 @@ export default function FieldStage({human,chimp,view,round=0,status='idle',last=
     if(reach){shoulder=current.top?-1.05:-.85;elbow=current.top?-.35:-.90;}
     if(attack&&arm.side===lead){shoulder+=m.windup*.42-m.extend*.68;elbow-=m.windup*.48;elbow+=m.extend*.45;}
     if(defending||current.under){shoulder=-1.75+(arm.side===1?.12:0);elbow=-1.15;}
+    if(kicking){shoulder=-.95;elbow=-1.10;}
     if(type==='break'||type==='recover'){shoulder=-.85;elbow=-.35;}
     if(moving){shoulder-=gait*arm.side*.12;}
     arm.shoulder.rotation.set(shoulder,0,arm.side*(defending?.12:current.ground?.24:humanSide?.06:.15));
@@ -141,7 +147,7 @@ export default function FieldStage({human,chimp,view,round=0,status='idle',last=
     // Front shoulder / upper arm contact; scale and ground orientation come from the actual rig.
     const target=new THREE.Vector3(-arm.side*(striking?.12:.38),other.isHuman?1.92:1.49,.27);
     other.body.localToWorld(target);
-    if(gripping&&action.type==='pull'){const otherArm=other.arms[arm.side===1?0:1];otherArm.elbow.getWorldPosition(target);}
+    if(gripping&&['pull','tear','bite'].includes(action.type)){const otherArm=other.arms[action.type==='pull'?(arm.side===1?0:1):1];otherArm.elbow.getWorldPosition(target);}
     reachArm(f,arm,target,weight);
    }
   }
@@ -162,13 +168,14 @@ export default function FieldStage({human,chimp,view,round=0,status='idle',last=
    for(const f of [h,c]){
     const side=f.isHuman?'human':'chimp',sign=f.isHuman?1:-1,from=coordinates(prev,side,s.startDistance),to=coordinates(action,side,s.startDistance);
     const actor=action?.side===side,ground=action?.position==='ground'||prev?.position==='ground';
-    const attacked=action&&action.side!=='none'&&!actor&&action.landed,missed=action&&action.side!=='none'&&!actor&&action.type==='miss';
+    const attacked=action&&action.side!=='none'&&!actor&&action.landed,missed=action&&action.side!=='none'&&!actor&&['miss','kick-miss'].includes(action.type);
     const travel=reduced?1:(action?.type==='takedown'?smooth(.25,.87,p):m.travel);
     let x=THREE.MathUtils.lerp(from.x,to.x,travel),z=THREE.MathUtils.lerp(from.z,to.z,travel);
     if(!ground&&action&&!reduced){
      if(actor&&action.type!=='approach')x+=sign*(-m.windup*.10+m.extend*.17);
      if(attacked)x-=sign*m.recoil*.12;
      if(missed)z+=((index%2)?1:-1)*m.extend*.27;
+     if(action.type==='tear')x-=sign*m.tug*(actor?.13:-.10);
     }
     f.g.position.set(x*Math.cos(angle)-z*Math.sin(angle),0,x*Math.sin(angle)+z*Math.cos(angle));
     f.g.rotation.y=(f.isHuman?Math.PI/2:-Math.PI/2)-angle;

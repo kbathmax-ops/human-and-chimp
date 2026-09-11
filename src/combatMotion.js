@@ -2,7 +2,7 @@
 export const CONTACT = .44;
 export const clamp01 = n => Math.min(1, Math.max(0, n));
 export const smooth = (a, b, n) => { const x = clamp01((n-a)/(b-a)); return x*x*(3-2*x); };
-export const duration = action => ({takedown:2000,recover:1800,turn:1600,clinch:1500,pull:1400,tear:1600,shot:1050,approach:1200,break:1350}[action?.type] ?? 1300);
+export const duration = action => ({takedown:1350,recover:1200,turn:1050,clinch:950,pull:850,tear:1150,bite:900,shot:650,approach:650,break:800,kick:900,'kick-miss':900}[action?.type] ?? 780);
 export function newPlayback(){return {index:0,elapsed:0,progress:0,time:0,committed:0,done:false};}
 export function advancePlayback(clock, ms, speed, rounds){
  if(clock.done||!rounds.length)return clock;
@@ -25,6 +25,7 @@ export function beat(progress){
   impact:smooth(CONTACT,.455,p)*(1-smooth(.46,.62,p)),
   travel:smooth(.12,.87,p),
   settle:smooth(.27,.90,p),
+  tug:smooth(.44,.58,p)*(1-smooth(.68,.92,p)),
  };
 }
 export function heading(index,seed=0){

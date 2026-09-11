@@ -19,9 +19,10 @@ try {
       if(step.position==='ground'){groundSteps++;assert(step.groundController);assert(step.distance<=1.15);}
       if(['bite','tear'].includes(step.type))assert(step.actionDistance<=1.15,'Contact attack at invalid distance.');
       if(step.type==='shot')assert(step.position!=='ground');
+      if(['kick','kick-miss'].includes(step.type)){assert.equal(step.side,'human');assert(!human.weapon);assert.equal(step.position,'standing');assert(step.actionDistance>=.85&&step.actionDistance<=1.75);if(step.type==='kick-miss')assert.equal(step.damage,0);else assert(step.damage>0);}
     }
     runs++;
   }
-  for(const type of ['clinch','pull','takedown','cover','frame','recover','tear','bite'])assert(actions.has(type),`Missing action: ${type}`);
+  for(const type of ['clinch','pull','takedown','cover','frame','recover','tear','bite','kick','kick-miss'])assert(actions.has(type),`Missing action: ${type}`);
   console.log(`${runs} seeded encounters passed; ${groundSteps} ground steps; ${actions.size} action types.`);
 } finally {await server.close();}
